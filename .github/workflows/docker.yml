@@ -1,0 +1,97 @@
+name: Docker Image CI
+
+on: [ push ]
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      platform: ${{ steps.platform.outputs.platform }}
+    steps:
+      - name: docker info
+        run: docker info
+
+      - name: env
+        id: env
+        run: |
+          NAME="${GITHUB_REF_NAME%/*}"
+          TAG="${GITHUB_REF_NAME##*/}"
+          IMAGE="$NAME:$TAG"
+
+          echo "IMAGE=$IMAGE"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: platform
+        id: platform
+        run: |
+          PLATFORM=$(docker manifest inspect "$IMAGE" | jq -rc '[.manifests[].platform.architecture]')
+          echo "platform=$PLATFORM"
+          echo "platform=$PLATFORM" >> $GITHUB_OUTPUT
+
+  build:
+    needs: matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: ${{ fromJson(needs.matrix.outputs.platform) }}
+
+    steps:
+      - name: docker login ${{ env.REGISTRY }}
+        run: |
+          echo ${{ secrets.REGISTRY_PASSWORD }} | docker login ${{ vars.REGISTRY }} --username ${{ secrets.REGISTRY_USERNAME }} --password-stdin
+
+      - name: env
+        run: |
+          NAME="${GITHUB_REF_NAME%/*}"
+          TARGET_NAME="${NAME##*/}"
+          TAG="${GITHUB_REF_NAME##*/}"
+          IMAGE="$NAME:$TAG"
+          TARGET_IMAGE="${{ vars.REGISTRY }}/${{ vars.NAMESPACE }}/$TARGET_NAME:$TAG"
+
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          echo "TARGET_IMAGE=$TARGET_IMAGE" >> $GITHUB_ENV
+
+      - name: docker pull ${{ matrix.platform }}
+        run: |
+          docker images
+          docker pull --platform=linux/${{ matrix.platform }} $IMAGE
+          docker images
+
+      - name: docker tag
+        run: |
+          docker tag $IMAGE $TARGET_IMAGE-${{ matrix.platform }}
+          docker images
+
+      - name: docker push
+        run: |
+          docker push $TARGET_IMAGE-${{ matrix.platform }}
+
+  merge:
+    needs: [ matrix, build ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: docker login ${{ env.REGISTRY }}
+        run: |
+          echo ${{ secrets.REGISTRY_PASSWORD }} | docker login ${{ vars.REGISTRY }} --username ${{ secrets.REGISTRY_USERNAME }} --password-stdin
+
+      - name: env
+        run: |
+          NAME="${GITHUB_REF_NAME%/*}"
+          TARGET_NAME="${NAME##*/}"
+          TAG="${GITHUB_REF_NAME##*/}"
+          TARGET_IMAGE="${{ vars.REGISTRY }}/${{ vars.NAMESPACE }}/$TARGET_NAME:$TAG"
+
+          echo "IMAGE=$IMAGE"
+          echo "TARGET_IMAGE=$TARGET_IMAGE" >> $GITHUB_ENV
+
+      - name: docker manifest create
+        run: |
+          IMAGES=""
+          for arch in $(echo '${{ needs.matrix.outputs.platform }}' | jq -r '.[]'); do
+            IMAGES="$IMAGES $TARGET_IMAGE-$arch"
+          done
+          docker manifest create $TARGET_IMAGE $IMAGES
+
+      - name: docker manifest push
+        run: |
+          docker manifest push $TARGET_IMAGE
