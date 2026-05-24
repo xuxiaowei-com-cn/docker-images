@@ -24,7 +24,7 @@ jobs:
       - name: platform
         id: platform
         run: |
-          PLATFORM=$(docker manifest inspect "$IMAGE" | jq -rc '[.manifests[].platform.architecture | select(. != "unknown")]')
+          PLATFORM=$(docker manifest inspect "$IMAGE" | jq -rc 'if .manifests then [.manifests[].platform.architecture | select(. != "unknown")] else ["amd64"] end')
           echo "platform=$PLATFORM"
           echo "platform=$PLATFORM" >> $GITHUB_OUTPUT
 
