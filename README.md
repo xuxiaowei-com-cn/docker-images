@@ -67,12 +67,16 @@ TAG="${GITHUB_REF_NAME##*/}"       # 最后一个 / 之后的内容 → 标签
 | `REGISTRY`  | 目标仓库地址 | registry.cn-qingdao.aliyuncs.com |
 | `NAMESPACE` | 目标命名空间 | xuxiaoweicomcn                   |
 
+![Variables.png](static/Variables.png)
+
 ### Secrets
 
 | 密钥                  | 说明      |
 |---------------------|---------|
 | `REGISTRY_USERNAME` | 目标仓库用户名 |
 | `REGISTRY_PASSWORD` | 目标仓库密码  |
+
+![Secrets.png](static/Secrets.png)
 
 ## 使用方法
 
