@@ -91,7 +91,6 @@ jobs:
           for arch in $(echo '${{ needs.matrix.outputs.platform }}' | jq -r '.[]'); do
             IMAGES="$IMAGES $TARGET_IMAGE-$arch"
           done
-          IMAGES="$IMAGES $TARGET_IMAGE-loong64"
           docker manifest create $TARGET_IMAGE $IMAGES
 
       - name: docker manifest push
